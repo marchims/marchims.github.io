@@ -1,9 +1,38 @@
 <html>
+  <script src='https://d3js.org/d3.v5.min.js'></script>
+  <style> rect {fill: lightblue; stroke: black; }</style>
   <head>
-    <title>Test Title</title>
+    <title>CS498 Data Visualization Project - msm10</title>
   </head>
   
   <body>
     <h1>Heading 1</h1>
+    
+    <svg width = 300, height = 300></svg>
+    
+    <script>
+      var data = [1,2,4,8,16]
+      var margin = 50
+      var svg = d3.select("svg")
+      
+      var width = svg.style("width")
+      var height = svg.style("height")
+      var xs = d3.scaleBand().domain([1,2,3,4,5]).range([0, width-2*margin])
+      var ys = d3.scaleLinear().domain([0,20]).range([height-2*margin, 0])
+      
+      svg.append("g")
+        .attr("transform","translate("+margin+","+margin+")")
+        .selectAll("rect")
+        .data(data)
+        .enter()
+        .append("rect")
+        .attr("x",function(d,i) {return xs(i);})
+        .attr("y",function(d,i) {return ys(d);})
+        .attr("width",xs.bandWidth())
+        .attr("height",function(d,i) {return height - 2*margin - ys(d);})
+    </script>
+    
+    
+    
   </body>
 </html>
