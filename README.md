@@ -1,2 +1,2 @@
 # marchims.github.io
-CS498 Visualization project
+CS498 Visualization Project
