@@ -6,30 +6,52 @@
   </head>
   
   <body>
-    <h1>Heading 1</h1>
+    <h1>Example plot</h1>
     
-    <svg width = 300, height = 300></svg>
+    <svg width=300, height=300></svg>
     
     <script>
       var data = [1,2,4,8,16]
       var margin = 50
       var svg = d3.select("svg")
       
-      var width = svg.style("width")
-      var height = svg.style("height")
-      var xs = d3.scaleBand().domain([1,2,3,4,5]).range([0, width-2*margin])
+      var width = parseInt(svg.attr("width"))
+      var height = parseInt(svg.attr("height"))
+      var xs = d3.scaleBand().domain([0,1,2,3,4]).range([0, width-2*margin])
       var ys = d3.scaleLinear().domain([0,20]).range([height-2*margin, 0])
       
+      function pick_color(d) {
+        var color = "lightblue"
+        if (d > 15) {
+          color = "red"
+        }
+        console.log("checking colors for " + d + ":" + color)
+        return color
+      }
+
+
       svg.append("g")
         .attr("transform","translate("+margin+","+margin+")")
         .selectAll("rect")
         .data(data)
         .enter()
         .append("rect")
-        .attr("x",function(d,i) {return xs(i);})
+        .attr("x",function(d,i) {return xs(i)+1;})
+        .attr("y",function(d,i) {return ys(0);})
+        .attr("width",xs.bandwidth()-5)
+        .attr("height",function(d,i) {return height - 2*margin - ys(0);})
+        .transition().duration(1000).delay(500)
         .attr("y",function(d,i) {return ys(d);})
-        .attr("width",xs.bandWidth())
         .attr("height",function(d,i) {return height - 2*margin - ys(d);})
+        .style("fill",function(d,i) {return pick_color(d);})
+
+      svg.append("g")
+        .attr("transform","translate("+margin+","+margin+")")
+        .call(d3.axisLeft(ys))
+        
+      svg.append("g")
+        .attr("transform","translate("+margin+","+(height-margin)+")")
+        .call(d3.axisBottom(xs))
     </script>
     
     
