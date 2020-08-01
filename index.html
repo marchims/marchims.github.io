@@ -3,6 +3,7 @@
 
 <html>
   <script src='https://d3js.org/d3.v5.min.js'></script>
+  <script src="https://d3js.org/d3-array.v2.min.js"></script>
   <script src="https://d3js.org/d3-scale-chromatic.v1.min.js"></script>
 
   <style> rect {fill: lightblue; stroke: black; }</style>
@@ -11,35 +12,35 @@
     <title>CS498 Data Visualization Project - msm10</title>
   </head>
   
-  <body onload="init()">
-    <h1>Atlantic Tropical Cyclones - Accumulated Cyclone Energy (ACE)</h1>
-    
-    <button onclick="update_ace('ace_sum')">ACE</button>
-    <button onclick="update_ace('ace')">Intensity</button>
-    <select id="selectYearButton"></select>
+  <body onload="init()" style = "font-family:Arial, Helvetica, sans-serif">
+    <h1 >Atlantic Tropical Cyclones - Accumulated Cyclone Energy (ACE)</h1>
 
-    <div id="ace_plot"></div>
+    <div id="plot_area"></div>
+    <div id="controls" style = "position: absolute;"></div>
     
     <script>
+      var year_off = 1980
       var all_data
-      var margin = {top: 10, right: 100, bottom: 80, left: 50},
-        width = 900 - margin.left - margin.right,
-        height = 600 - margin.top - margin.bottom;
+      var all_ace_sum
+      var num_storms = []
+      var season_thresh = [[0,66],[66,111],[111,153],[153,280]] // ACE categories
+      var tooltip_offset = {x: 20, y:0}
+      var all_ace_total = []
+      var margin = {top: 30, right: 200, bottom: 50, left: 50},
+        width = 1100 - margin.left - margin.right,
+        height = 620 - margin.top - margin.bottom;
       
-      var svg = d3.select("#ace_plot")
+      var svg = d3.select("#plot_area")
         .append("svg")
           .attr("width", width + margin.left + margin.right)
           .attr("height", height + margin.top + margin.bottom)
         .append("g")
           .attr("transform",
                 "translate(" + margin.left + "," + margin.top + ")");
-      
-      
-      
-      
-
-      d3.select("body").append("p").html("Page is loaded. About to load spreadsheet...")
-
+      var controls = d3.select("#controls")
+        .append("g")
+        .attr("transform",
+                "translate(" + margin.left + "," + height + ")");
       async function init() {
         // Load the csv and get ready to plot some things
         all_data = await d3.csv("https://marchims.github.io/atl_hurricane_1980_2019.csv")
@@ -52,13 +53,395 @@
           d["Dissipation Date"] = time_parse(d["Dissipation Date"]) || 0
           d["Usa Pres"] = +d["Usa Pres"]
           d["Usa Wind"] = +d["Usa Wind"]
+          d["Season_num"] = +d["Season"]
         })
-        d3.select("body").select("p").html("Page and csv loaded! First SID: " + all_data[0].SID)
+        var sum_ace = []
+        var sum_ace_idx = 0
+        var date_fmt = d3.timeFormat("%m/%d/%Y %H:%M:%S")
+        var ext = d3.extent(all_data, function(d) {return d.Season_num;})
+        // Initialize plot of all season's ace values
+        for (let index = ext[0]; index <= ext[1]; index++) {
+          var ace_  = get_ace(String(index),"")
+          all_ace_total[index-year_off] = []
+          all_ace_total[index-year_off]["season"] = String(index)
+          all_ace_total[index-year_off]["ace"] = ace_[2]
 
-        // Keep only 2019 season, for testing
+
+          // count the number of storms that year
+          num_storms[index-year_off] = ace_[0].length
 
 
-        plot_ace("1980","")
+          // prepping for avg
+          var temp = d3.nest()
+            .key(function(d) { return date_fmt(d.date);})
+            .entries(ace_[1]);
+          
+          temp.forEach( function(d) {
+            d.ace = d.values.reduce(function(a, b){ 
+              return a + b.ace;
+              }, 0)
+            d.values = d.values.reduce(function(a, b){ 
+              return a + b.ace_sum;
+              }, 0)
+            sum_ace[sum_ace_idx] = []
+            sum_ace[sum_ace_idx].date = d.key
+            sum_ace[sum_ace_idx].ace_sum = d.values
+            sum_ace[sum_ace_idx].ace = d.ace
+            sum_ace_idx = sum_ace_idx + 1
+          })
+          
+        }
+        var time_parse = d3.timeParse("%m/%d/%Y %H:%M:%S")
+        all_ace_sum = d3.nest()
+            .key(function(d) { return d.date;})
+            .entries(sum_ace);
+        all_ace_sum.forEach( function(d) {
+          var N = d.values.length
+          d.ace = d.values.reduce(function(a, b){ 
+            return Math.max(a,b.ace);
+            }, 0)
+          d.values = d.values.reduce(function(a, b){ 
+            return a + b.ace_sum;
+            }, 0)/(ext[1]-ext[0]+1)
+          d.key = time_parse(d.key)
+        })
+        all_ace_sum = all_ace_sum.sort(function(a,b) { return a.key - b.key; })
+        all_ace_sum.forEach( function(d,i,arr) {
+          var d_sum = d.ace
+          var n_sum = 1
+          if (i > 0) {
+            if (d.values < arr[i-1].values) {
+              d.values = arr[i-1].values
+            }
+            d_sum = d_sum + arr[i-1].ace
+            n_sum = n_sum + 1
+          }
+          if (i < arr.length-1) {
+            d_sum = d_sum + arr[i+1].ace
+            n_sum = n_sum + 1
+          }
+          d.ace = d_sum/n_sum
+        })
+
+        plot_all()
+        //plot_ace("1980","")
+      }
+
+      function clear_plot() {
+        controls.selectAll("button").remove()
+        controls.selectAll("select").remove()
+        controls.selectAll("text").remove()
+
+        svg.selectAll(".ace_curve").remove()
+        svg.selectAll(".ace_points").remove()
+        svg.selectAll(".ace_climo").remove()
+
+        svg.selectAll("g").remove()
+        svg.selectAll("text").remove()
+
+        svg.selectAll(".activity_rect").remove()
+        d3.selectAll(".activity_annotation").remove()
+        d3.selectAll(".ace_annotation").remove()
+        d3.selectAll(".all_annotation").remove()
+        svg.selectAll("legend").remove()
+      }
+
+      function num_storms_color(n) {
+        if ( n >= 10 && n <= 14) {
+          // average season
+          return "slategray"
+        } else if (n < 10) {
+          // below average season
+          return "dodgerblue"
+        } else { 
+          // above average season
+          return "crimson"
+        }
+      }
+
+      function plot_all() {
+
+        clear_plot()
+
+        svg.append("g")
+          .attr("transform","translate(0,"+height+")")
+          .attr("class","all_xax")
+
+        svg.append("text")
+          .attr("text-anchor", "middle")
+          .attr("transform", "translate(" + (width/2) + ","+((height+margin.bottom))+")") 
+          .attr("class","all_xax_label")
+          .text("Year");
+          
+        svg.append("g")
+          .attr("class","all_yax")
+          
+          
+        svg.append("text")
+          .attr("text-anchor", "middle")
+          .attr("transform", "translate(-30,"+((height+margin.top)/2)+")rotate(-90)") 
+          .attr("class","all_yax_label")
+          .text("ACE");
+
+        svg.attr("year","")
+          .attr("storm","")
+
+
+        var colors = ["steelblue","limegreen","goldenrod","red"]
+        // Create the rects to show the activity level
+        svg.selectAll(".activity_rect")
+          .data(season_thresh)
+          .enter()
+          .append("rect")
+            .attr("class","activity_rect")
+            .attr("opacity",0.3)
+            .style("fill", function(d,i) {return colors[i];})
+            .style("stroke", "none")
+
+
+        // legend to describe the dot colors
+        var legend = svg.append("g")
+          .attr("transform", "translate(10,10)") 
+          .attr("class","legend")
+        legend.append("rect")
+          .style("opacity",0)
+          .attr("x", 0)
+          .attr("y", 0)
+          .attr("width", 220)
+          .attr("height", 130)
+          .attr("rx",5)
+          .attr("ry",5)
+          .style("fill","white")
+          .style("stroke","none")
+          .transition()
+          .duration(1000)
+          .delay(500)
+          .style("opacity",0.6)
+        // Entries
+        var spacing = 30
+        var off = [30,45]
+        var text_spacing = 20
+        legend.append("text")
+          .style("opacity",0)
+          .attr("x", 110)
+          .attr("y", 20)
+          .attr("text-anchor", "middle")
+          .attr("font-weight", "bold")
+          .text("Number of named storms")
+        legend.append("circle")
+          .style("opacity",0)
+          .attr("cx", off[0])
+          .attr("cy", off[1])
+          .attr("r", 10)
+          .style("fill", num_storms_color(50))
+        legend.append("text")
+          .style("opacity",0)
+          .attr("x", off[0] + text_spacing)
+          .attr("y", off[1]+6)
+          .attr("text-anchor", "left")
+          .text("Above Normal (>14)")
+        legend.append("circle")
+          .style("opacity",0)
+          .attr("cx", off[0])
+          .attr("cy", off[1] + spacing)
+          .attr("r", 10)
+          .style("fill", num_storms_color(12))
+        legend.append("text")
+          .style("opacity",0)
+          .attr("x", off[0] + text_spacing)
+          .attr("y", off[1] + spacing +6)
+          .attr("text-anchor", "left")
+          .text("Near Normal (10-14)")
+        legend.append("circle")
+          .style("opacity",0)
+          .attr("cx", off[0])
+          .attr("cy", off[1] + spacing*2)
+          .attr("r", 10)
+          .style("fill", num_storms_color(0))
+        legend.append("text")
+          .style("opacity",0)
+          .attr("x", off[0] + text_spacing)
+          .attr("y", off[1] + spacing*2 + 6)
+          .attr("text-anchor", "left")
+          .text("Below Normal (<10)")
+
+        legend.selectAll("text")
+          .attr("font-family","Arial")
+          .transition()
+          .duration(1000)
+          .delay(500)
+          .style("opacity",1)
+        legend.selectAll("circle")
+          .transition()
+          .duration(1000)
+          .delay(500)
+          .style("opacity",1)
+
+        d3.select("#plot_area").selectAll(".activity_annotation")
+          .data(["Below Normal ACE","Near Normal ACE","Above Normal ACE","Hyperactive ACE"])
+          .enter()
+          .append("div")
+            .attr("class", "activity_annotation")
+            .style("opacity", 0.4)
+            .style("background-color", "white")
+            .style("border-radius", "5px")
+            .style("font-family", "Arial")
+            .style("padding", "5px")
+            .style("color", "black")
+            .style("position", "absolute")
+            .style("font-size", "13px")
+            .html(function(d) {return "<b>" + d + "</b>";})
+
+        // create a tooltip
+        d3.select("#plot_area").selectAll(".tooltip").remove()
+        var tooltip = d3.select("#plot_area")
+          .append("div")
+            .attr("class", "tooltip")
+            .style("opacity", 0)
+            .style("background-color", "lightblue")
+            .style("border-radius", "5px")
+            .style("padding", "5px")
+            .style("color", "black")
+            .style("position", "absolute")
+
+        // Annotations for storm totals
+        var annot = d3.select("#plot_area")
+          .append("div")
+            .attr("class", "all_annotation")
+            .style("opacity", 0)
+            .style("background-color", "lightblue")
+            .style("border-radius", "5px")
+            .style("font-family", "Arial")
+            .style("padding", "5px")
+            .style("color", "black")
+            .style("position", "absolute")
+            .style("top", "116px")
+            .style("left", "1050px")
+            .style("max-width","300px")
+        annot.html("")
+
+        // Create Title
+        svg.append("text")
+          .attr("class","plot_title")
+          .attr("text-anchor", "middle")
+          .attr("x", (width / 2))             
+          .attr("y", 0)
+          .attr("font-size", 24)
+          .text("ACE Values - 1980 to 2019");
+
+          
+
+        update_all_plot("ace_sum")
+      }
+
+      function update_all_plot() {
+
+        svg.attr("plot_type","")
+
+        // Axis setup
+        var xs = d3.scaleTime()
+          .range([0, width])
+          .domain([year_off-1, all_ace_total.length+year_off+1])
+        var ylim = d3.extent(all_ace_total, function(d) {return d.ace;})
+        var ys = d3.scaleLinear()
+          .range([height, 0])
+          .domain([0, ylim[1] + 40])
+
+
+        var xax = d3.axisBottom().scale(xs).tickFormat(d3.format("d"))
+        svg.selectAll(".all_xax")
+          .transition()
+          .duration(1000)
+          .call(xax)
+        var yax = d3.axisLeft().scale(ys)
+        svg.selectAll(".all_yax").transition()
+          .duration(1000)
+          .call(yax)
+
+        // Backdrop activity level rect
+        svg.selectAll(".activity_rect")
+          .attr("x",function(d) { return xs(year_off-1);})
+          .attr("y",function(d) { return ys(d[1]);})
+          .attr("width",function(d) { 
+            return xs(all_ace_total.length+year_off+1) - xs(year_off-1) + 120;})
+          .attr("height",function(d) { return ys(d[0])-ys(d[1]);})
+
+        // Seasonal norm annotations
+        d3.selectAll(".activity_annotation")
+          .style("left", function(d,i) { return width + 45 + "px";})
+          .style("top", function(d,i) { return ys((season_thresh[i][1]+season_thresh[i][0])/2) + margin.top + 67 + "px";})
+          .transition()
+          .duration(1000)
+          .style("opacity", 1)
+
+
+        // mouse events
+        var mouseover = function(d,i) {
+          grp = i + year_off
+          d3.selectAll(".tooltip")
+            .style("left", d3.event.pageX + tooltip_offset.x + "px")
+            .style("top", d3.event.pageY + tooltip_offset.y + "px")
+            .style("opacity", 1)
+          d3.selectAll(".tooltip").html(grp + "<br/>ACE: "+d.ace.toFixed(2) + "<br/>Named Storms: "+num_storms[i])
+          d3.select(this)
+            .style("stroke", "black")
+        }
+        var mousemove = function(d,i) {
+          grp = i + year_off
+          d3.selectAll(".tooltip")
+            .style("left", d3.event.pageX + tooltip_offset.x + "px")
+            .style("top", d3.event.pageY + tooltip_offset.y + "px")
+          d3.selectAll(".tooltip").html(grp + "<br/>ACE: "+d.ace.toFixed(2) + "<br/>Named Storms: "+num_storms[i])
+        }
+        var mouseleave = function(d) {
+          d3.selectAll(".tooltip")
+            .style("opacity", 0)
+          d3.select(this)
+            .style("stroke", "white")
+        }
+
+        // Click callback
+        var click_year = function(d,i) {
+          plot_ace(String(i+year_off),"")
+        }
+
+        // Annotation
+        var annot = d3.select(".all_annotation")
+        if (annot.style("opacity") == 1) {
+          annot
+            .transition()
+            .duration(500)
+            .style("opacity", 0)
+        }
+        annot
+          .transition()
+          .duration(1000)
+          .style("opacity", 1)
+        annot.html("Accumulated Cyclone Energy (ACE) is a measure of tropical cyclone activity. Compared with an average hurricane season, active seasons feature either a larger number of storms, or have a few of high intensity.<br/><br/>ACE is typically calculated as the sum of the square of each storm's max winds at 6 hour intervals throughout the season.<br/><br/>Click on any a year to take a closer look.")
+
+        svg.selectAll(".ace_points")
+          .data(all_ace_total)
+          .enter()
+          .append("circle")
+          .attr("class","ace_points")
+          .on("mouseover", mouseover)
+          .on("mouseleave", mouseleave)
+          .on("mousemove", mousemove)
+          .on("click", click_year)
+          .attr("cx", function(d) {return xs(+d.season);})
+          .attr("cy", function(d) {return ys(0);})
+          .attr("r", 10)
+          .style("fill", function(d,i) {return num_storms_color(12);})
+          .transition()
+          .duration(1000)
+          .attr("cx", function(d) {return xs(+d.season);})
+          .attr("cy", function(d) {return ys(+d.ace);})
+          .attr("r", 10)
+          .transition()
+          .duration(250)
+          .delay(500)
+          .style("fill", function(d,i) {return num_storms_color(num_storms[i]);})
+          .style("stroke", "white")
       }
 
       function get_ace(year, storm) {
@@ -66,7 +449,7 @@
         var year_data
         if (storm == "") {
           // Find all storms by year, get names, then get all storm data for those
-          year_data = all_data.filter(function(d) { return d.Season == year && d["Iso Time"] > new Date(0)})
+          year_data = all_data.filter(function(d) { return d.Name != "NOT_NAMED" && d.Season == year && d["Iso Time"] > new Date(0)})
             .sort(function(a,b) { return a["Iso Time"] - b["Iso Time"]; })
           storm = d3.map(year_data, function(d){return d.Name;}).keys()
           year_data = year_data.filter(function(d) { return storm.includes(d.Name)}).sort(function(a,b) { return a["Iso Time"] - b["Iso Time"]; })
@@ -79,12 +462,11 @@
         var dt
         var t_lim = d3.extent(year_data, function(d) {return d["Iso Time"];})
         var dateRange = d3.timeHour.range(d3.timeDay.floor(t_lim[0]), d3.timeYear.ceil(t_lim[0]),6);
-        
+        var total_ace_year = 0
         var master_idx = 0
         storm.forEach(function(name,name_idx) {
           // integrate the wind speed for each storm
           storm_data = year_data.filter(function(d) { return name == d.Name})
-          console.log("Processing " + name + "...")
           // find start index for first date for this storm, last_t_idx is time when storm starts
           var storm_time_idx = 0
 
@@ -127,15 +509,50 @@
             }
             master_idx = master_idx + 1
           })
-          var p = null
-          //ace_data = ace_data.filter(function(d) { return d.date > new Date(0)})
+          // Keep rolling total of ACE for the season
+          if (master_idx > 0) {
+            total_ace_year = total_ace_year + ace_data[master_idx-1]["ace_sum"]
+          }
         })
-        
-
-        return [storm, ace_data]
+        return [storm, ace_data, total_ace_year]
       }
 
       function plot_ace(year, storm) {
+
+        clear_plot()
+
+        // setup buttons
+        d3.select("#controls").style("top", 130 + "px")
+          .style("opacity",0)
+          .style("left", 90 + "px")
+          .transition()
+          .duration(1000)
+          .style("opacity",1)
+        controls
+          .append("button")
+          .attr("onclick","update_ace('ace_sum')")
+          .attr("class","plot_type_ace_sum")
+          .text("ACE over Time")
+        controls
+          .append("button")
+          .attr("onclick","update_ace('ace')")
+          .attr("class","plot_type_ace")
+          .text("Intensity over Time")
+        controls
+          .append("button")
+          .attr("onclick","plot_all()")
+          .attr("class","to_main_plot")
+          .text("All seasons")
+        controls
+          .append("text")
+          .text("Pick another year:")
+        controls
+          .append("select")
+          .attr("id","selectYearButton")
+        //<button onclick="update_ace('ace_sum')" class="plot_type_ace_sum">ACE</button>
+        //<button onclick="update_ace('ace')"class="plot_type_ace">Intensity</button>
+        //<select id="selectYearButton"></select>
+
         svg.append("g")
           .attr("transform","translate(0,"+height+")")
           .attr("class","ace_xax")
@@ -155,27 +572,57 @@
           .attr("class","ace_yax_label")
           .text("ACE");
 
+
         svg.attr("year",year)
           .attr("storm",storm)
 
-
-        // create a tooltip
+        // Create annotation for the climo data
         svg.append("text")
-          .attr("class","ace_tooltip")
-          .attr("x", margin.left)
-          .attr("y", margin.top)
-          .style("opacity", 0)
-          .style("font-size", 17)
+          .attr("class","climo_annotation")
+          .attr("text-anchor", "left")
+          .attr("x", width+5)             
+          .attr("y", 0)
+          .attr("font-size", 16)
+          .attr( "fill-opacity", 0 )
+          .text("1980-2019 Average");
+
+        // Annotations for storm totals
+        var annot = d3.select("#plot_area")
+          .append("div")
+            .attr("class", "ace_annotation")
+            .style("opacity", 0)
+            .style("background-color", "lightblue")
+            .style("border-radius", "5px")
+            .style("font-family", "Arial")
+            .style("padding", "5px")
+            .style("color", "black")
+            .style("position", "absolute")
+            .style("top", "200px")
+            .style("left", "100px")
+            //.style("width", "200px")
+            //.style("height", "50px")
+        annot.html("")
+
+        d3.select("#plot_area").selectAll(".tooltip").remove()
+        var tooltip = d3.select("#plot_area")
+          .append("div")
+            .attr("class", "tooltip")
+            .style("opacity", 0)
+            .style("background-color", "lightblue")
+            .style("border-radius", "5px")
+            .style("padding", "5px")
+            .style("color", "black")
+            .style("position", "absolute")
 
         // Create Title
         svg.append("text")
-          .attr("class","ace_title")
+          .style("font-size", 24)
+          .attr("class","plot_title")
           .attr("text-anchor", "middle")
           .attr("x", (width / 2))             
-          .attr("y", (margin.top / 2))
-          .style("font-size", 17)
-          .text(year);
-
+          .attr("y", 0)
+          .attr("font-size", 24)
+        
         var all_years = d3.map(all_data, function(d){return(d.Season)}).keys().sort()
         // add the options to the button
         d3.select("#selectYearButton")
@@ -208,8 +655,7 @@
         var ace_ = get_ace(svg.attr("year"), svg.attr("storm"))
         var ace = ace_[1]
         var storms = ace_[0]
-
-        
+        var total_ace = ace_[2]
 
         var line
         var fill = "none"
@@ -242,12 +688,34 @@
         // plot type specifics
         if (plot_type == "ace") {
           svg.selectAll(".ace_yax_label").text("Cyclone Intensity");
-          ys.domain([0,5])
+          var ylim = d3.extent(ace_stacked, function(d) {
+              return d3.max(d, function(d2) { return d2[1];})
+            })
+
+          ys.domain([0,1.2*ylim[1]])
+          
+          //Climo Annotation
+          svg.selectAll(".climo_annotation")
+            .transition()
+            .duration(1000)
+            .attr( "fill-opacity", 0 )
+            
         } else {
           svg.selectAll(".ace_yax_label").text("ACE");
-          ys.domain([0,280])
+          var ylim = d3.extent(ace_stacked, function(d) {return d[d.length-1][1]})
+          ys.domain([0,1.2*Math.max(ylim[1], d3.max(all_ace_sum, function(d) {return d.values;}) )])
+          
+          //Climo Annotation
+          svg.selectAll(".climo_annotation")
+            .transition()
+            .duration(1000)
+            .attr("x", width)             
+            .attr("y", ys(d3.max(all_ace_sum, function(d) {return d.values;}))+5 )
+            .transition()
+            .duration(1000)
+            .attr( "fill-opacity", 1 )
         }
-        svg.selectAll(".ace_title")
+        svg.select(".plot_title")
           .text(svg.attr("year") + " Season");
 
         var xax = d3.axisBottom().scale(xs).tickFormat(d3.timeFormat("%b-%d"))
@@ -264,11 +732,20 @@
         svg.selectAll(".ace_yax").transition()
           .duration(1000)
           .call(yax)
-        
 
         // mouse events
-        var ace_mouseover = function(d) {
-          svg.selectAll(".ace_tooltip").style("opacity", 1)
+        var ace_mouseover = function(d,i) {
+          grp = storms[i]
+          max_ace = d3.max(d, function(d) { return d[1] - d[0];} )
+          d3.selectAll(".tooltip")
+            .style("left", d3.event.pageX + tooltip_offset.x + "px")
+            .style("top", d3.event.pageY + tooltip_offset.y + "px")
+            .style("opacity", 1)
+          if (plot_type == "ace") {
+            d3.selectAll(".tooltip").html(grp + "<br/>Peak Intensity: "+max_ace.toFixed(2))
+          } else { 
+            d3.selectAll(".tooltip").html(grp + "<br/>ACE: "+max_ace.toFixed(2))
+          }
           d3.selectAll(".ace_curve").style("opacity", .2)
           d3.select(this)
             .style("stroke", "black")
@@ -276,60 +753,145 @@
         }
         var ace_mousemove = function(d,i) {
           grp = storms[i]
-          var max_ace
-          var py = ys(d3.max(d, function(d) { return d[1]+d[0];} )/2)
-          var ace_tooltip = svg.selectAll(".ace_tooltip")
-          ace_tooltip.attr("x",width+5)
-          ace_tooltip.attr("y",py)
+          max_ace = d3.max(d, function(d) { return d[1] - d[0];} )
+          d3.selectAll(".tooltip")
+            .style("left", d3.event.pageX + tooltip_offset.x + "px")
+            .style("top", d3.event.pageY + tooltip_offset.y + "px")
           if (plot_type == "ace") {
-            max_ace = d3.max(d, function(d) { return d[1] - d[0];} )
-            ace_tooltip.text(grp)
-          } else {
-            max_ace = d3.max(d, function(d) { return d[1] - d[0];} )
-            ace_tooltip.text(grp)
+            d3.selectAll(".tooltip").html(grp + "<br/>Peak Intensity: "+max_ace.toFixed(2))
+          } else { 
+            d3.selectAll(".tooltip").html(grp + "<br/>ACE: "+max_ace.toFixed(2))
           }
-          
         }
         var ace_mouseleave = function(d) {
-          svg.selectAll(".ace_tooltip").style("opacity", 0)
+          d3.selectAll(".tooltip")
+            .style("opacity", 0)
           d3.selectAll(".ace_curve")
             .style("opacity", 1)
             .style("stroke", function(d) { return color(d.key); })
         }
+
+
+        var annot = d3.select(".ace_annotation")
+        if (annot.style("opacity") == 1) {
+          annot
+            .transition()
+            .duration(500)
+            .style("opacity", 0)
+        }
+        annot
+          .transition()
+          .duration(1000)
+          .style("opacity", 1)
+
+        var avg = "Near Normal"
+        if (storms.length < 10) {
+          avg = "Below Normal"
+        } else if (storms.length > 14) {
+          avg = "Above Normal"
+        }
+
+        var ace_avg = "Near Normal"
+        if (total_ace < season_thresh[1][0]) {
+          ace_avg = "Below Normal"
+        } else if (total_ace >= season_thresh[2][0]) {
+          if (total_ace >= season_thresh[3][0]) {
+            ace_avg = "Hyperactive"
+          } else {
+            ace_avg = "Above Normal"
+          }
+        }
         
+        annot.html("<b>Storms:</b> " + storms.length + " (" + avg + ")<br/><b>ACE:</b> " + total_ace.toFixed(2) + " (" + ace_avg + ")")
+
+
+        var ace_total_text = d3.select(".num_ace")
         var join = svg.selectAll(".ace_curve").data(ace_stacked)
         join.enter()
           .append("path")
           .attr("class","ace_curve")
-          .attr("d", d3.area()
-            .x(function(d, i) { return xs(time_parse(d.data.key)); })
-            .y0(function(d) { return ys(0); })
-            .y1(function(d) { return ys(0); })
-          )
           .merge(join)
           .on("mouseover", ace_mouseover)
           .on("mouseleave", ace_mouseleave)
           .on("mousemove", ace_mousemove)
           .transition()
-          .duration(1000)
+          .duration(500)
+          .attr("d", d3.area()
+            .x(function(d, i) { return xs(time_parse(d.data.key)); })
+            .y0(function(d) { return ys(0); })
+            .y1(function(d) { return ys(0); })
+          )
+          .transition()
+          .duration(500)
+          .delay(function(d, i) { return 250*i;})
           .style("fill", function(d) { return color(d.key); })
-          .style("stroke", function(d) { return color(d.key); })
+          .style("stroke", "none")
+          .attr("stroke-width", 0.5)
           .attr("d", d3.area()
             .x(function(d, i) { return xs(time_parse(d.data.key)); })
             .y0(function(d) { return ys(d[0]); })
             .y1(function(d) { return ys(d[1]); })
           )
-          join.exit()
+          .transition()
+          .duration(100)
+        join.exit()
+          .remove()
+
+
+        
+        if (plot_type == "ace") {
+          svg.selectAll(".ace_climo")
+            .transition()
+            .duration(500)
+            .attr("d", d3.line()
+              .x(function(d, i) { return xs(d.key); })
+              .y(function(d) { return ys(0); })
+            )
+            .attr("fill","none")
+            .attr("stroke","none")
+          /*
+          var join = svg.selectAll(".ace_climo").data([all_ace_sum])
+          join.enter()
+            .append("path")
+            .attr("class","ace_climo")
+            .attr("fill","none")
+            .attr("stroke","black")
+            .merge(join)
+            .transition()
+            .duration(500)
+            .attr("d", d3.line()
+              .x(function(d, i) { return xs(d.key); })
+              .y(function(d) { return ys(0); })
+            )
             .transition()
             .duration(1000)
-            .attr("d", d3.area()
-              .x(function(d, i) { return xs(time_parse(d.data.key)); })
-              .y0(function(d) { return ys(0); })
-              .y1(function(d) { return ys(0); })
+            .attr("d", d3.line()
+              .x(function(d, i) { return xs(d.key); })
+              .y(function(d) { return ys(d.ace); })
             )
+          join.exit()
             .remove()
-        }
+          */
+        } else {
+          var join = svg.selectAll(".ace_climo").data([all_ace_sum])
+          join.enter()
+            .append("path")
+            .merge(join)
+            .attr("class","ace_climo")
+            .attr("fill","none")
+            .attr("stroke","black")
+            .transition()
+            .duration(1000)
+            .attr("d", d3.line()
+              .x(function(d) { return xs(d.key) })
+              .y(function(d) { return ys(d.values) })
+              )
 
+        }
+        svg.selectAll(".ace_climo").raise()
+      }
+        
+        
         /*
         var update_obj = svg.selectAll(".ace_curve").data([ace], function(d) {return d.date;})
         update_obj.enter()
