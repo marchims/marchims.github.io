@@ -89,7 +89,7 @@
             sum_ace[sum_ace_idx].ace = d.ace
             sum_ace_idx = sum_ace_idx + 1
           })
-          
+
         }
         var time_parse = d3.timeParse("%m/%d/%Y %H:%M:%S")
         all_ace_sum = d3.nest()
@@ -142,6 +142,7 @@
         svg.selectAll(".activity_rect").remove()
         d3.selectAll(".activity_annotation").remove()
         d3.selectAll(".ace_annotation").remove()
+        d3.selectAll(".ace_annotation_2").remove()
         d3.selectAll(".all_annotation").remove()
         svg.selectAll("legend").remove()
       }
@@ -417,7 +418,7 @@
           .transition()
           .duration(1000)
           .style("opacity", 1)
-        annot.html("Accumulated Cyclone Energy (ACE) is a measure of tropical cyclone activity. Compared with an average hurricane season, active seasons feature either a larger number of storms, or have a few of high intensity.<br/><br/>ACE is typically calculated as the sum of the square of each storm's max winds at 6 hour intervals throughout the season.<br/><br/>Click on any a year to take a closer look.")
+        annot.html("Accumulated Cyclone Energy (ACE) is a measure of tropical cyclone activity, with higher numbers meaning more activity. Compared with an average hurricane season, active seasons feature either a larger number of storms, or have a few of high intensity.<br/><br/>ACE is typically calculated as the sum of the square of each storm's max winds at 6 hour intervals throughout the season.<br/><br/>The data described here apply to the North Atlantic basin, which produces landfalling storms for North America.<br/><br/>Click on any year to take a closer look.")
 
         svg.selectAll(".ace_points")
           .data(all_ace_total)
@@ -524,28 +525,22 @@
         // setup buttons
         d3.select("#controls").style("top", 130 + "px")
           .style("opacity",0)
-          .style("left", 90 + "px")
+          .style("left", 80 + "px")
           .transition()
           .duration(1000)
           .style("opacity",1)
         controls
           .append("button")
-          .attr("onclick","update_ace('ace_sum')")
-          .attr("class","plot_type_ace_sum")
-          .text("ACE over Time")
-        controls
-          .append("button")
-          .attr("onclick","update_ace('ace')")
-          .attr("class","plot_type_ace")
-          .text("Intensity over Time")
+          .attr("class","plot_type")
+          .style("width","140px")
         controls
           .append("button")
           .attr("onclick","plot_all()")
           .attr("class","to_main_plot")
-          .text("All seasons")
+          .text("Back to Overview")
         controls
           .append("text")
-          .text("Pick another year:")
+          .text("\tPick another year:\t")
         controls
           .append("select")
           .attr("id","selectYearButton")
@@ -561,6 +556,11 @@
           .attr("dx", "-.8em")
           .attr("dy", ".15em")
           .attr("transform", "rotate(-65)")
+        svg.append("text")
+          .attr("text-anchor", "middle")
+          .attr("transform", "translate(" + (width/2) + ","+((height+margin.bottom))+")") 
+          .attr("class","ace_xax_label")
+          .text("Date");
           
         svg.append("g")
           .attr("class","ace_yax")
@@ -571,6 +571,8 @@
           .attr("transform", "translate(-30,"+((height+margin.top)/2)+")rotate(-90)") 
           .attr("class","ace_yax_label")
           .text("ACE");
+
+        
 
 
         svg.attr("year",year)
@@ -591,16 +593,32 @@
           .append("div")
             .attr("class", "ace_annotation")
             .style("opacity", 0)
-            .style("background-color", "lightblue")
+            .style("background-color", "lightsteelblue")
             .style("border-radius", "5px")
             .style("font-family", "Arial")
             .style("padding", "5px")
             .style("color", "black")
             .style("position", "absolute")
             .style("top", "200px")
-            .style("left", "100px")
+            .style("left", "80px")
             //.style("width", "200px")
             //.style("height", "50px")
+        annot.html("")
+
+        // Annotations for ACE information
+        var annot = d3.select("#plot_area")
+          .append("div")
+            .attr("class", "ace_annotation_2")
+            .style("opacity", 0)
+            .style("background-color", "lightblue")
+            .style("border-radius", "5px")
+            .style("font-family", "Arial")
+            .style("padding", "5px")
+            .style("color", "black")
+            .style("position", "absolute")
+            .style("top", "260px")
+            .style("left", "80px")
+            .style("max-width","300px")
         annot.html("")
 
         d3.select("#plot_area").selectAll(".tooltip").remove()
@@ -632,6 +650,7 @@
           .append('option')
           .text(function (d) { return d; }) // text showed in the menu
           .attr("value", function (d) { return d; }) // corresponding value returned by the button
+          .property("selected", function(d){ return d === svg.attr("year"); })
 
         // When the button is changed, run the updateChart function
         d3.select("#selectYearButton").on("change", function(d) {
@@ -687,7 +706,14 @@
 
         // plot type specifics
         if (plot_type == "ace") {
-          svg.selectAll(".ace_yax_label").text("Cyclone Intensity");
+
+          controls.select(".plot_type")
+            .attr("onclick","update_ace('ace_sum')")
+            .text("ACE over Time")
+          svg.select(".plot_title")
+            .text(svg.attr("year") + " Season - Storm Intensity over Time");
+
+          svg.selectAll(".ace_yax_label").text("Storm Intensity");
           var ylim = d3.extent(ace_stacked, function(d) {
               return d3.max(d, function(d2) { return d2[1];})
             })
@@ -701,6 +727,13 @@
             .attr( "fill-opacity", 0 )
             
         } else {
+
+          controls.select(".plot_type")
+            .attr("onclick","update_ace('ace')")
+            .text("Intensity over Time")
+          svg.select(".plot_title")
+            .text(svg.attr("year") + " Season - ACE over Time");
+
           svg.selectAll(".ace_yax_label").text("ACE");
           var ylim = d3.extent(ace_stacked, function(d) {return d[d.length-1][1]})
           ys.domain([0,1.2*Math.max(ylim[1], d3.max(all_ace_sum, function(d) {return d.values;}) )])
@@ -715,8 +748,7 @@
             .duration(1000)
             .attr( "fill-opacity", 1 )
         }
-        svg.select(".plot_title")
-          .text(svg.attr("year") + " Season");
+        
 
         var xax = d3.axisBottom().scale(xs).tickFormat(d3.timeFormat("%b-%d"))
         svg.selectAll(".ace_xax")
@@ -727,7 +759,7 @@
           .style("text-anchor", "end")
           .attr("dx", "-.8em")
           .attr("dy", ".15em")
-          .attr("transform", "rotate(-65)")
+          .attr("transform", "rotate(-55)")
         var yax = d3.axisLeft().scale(ys)
         svg.selectAll(".ace_yax").transition()
           .duration(1000)
@@ -771,7 +803,7 @@
             .style("stroke", function(d) { return color(d.key); })
         }
 
-
+        // Storm total annotations
         var annot = d3.select(".ace_annotation")
         if (annot.style("opacity") == 1) {
           annot
@@ -801,8 +833,39 @@
             ace_avg = "Above Normal"
           }
         }
-        
         annot.html("<b>Storms:</b> " + storms.length + " (" + avg + ")<br/><b>ACE:</b> " + total_ace.toFixed(2) + " (" + ace_avg + ")")
+
+        // Additional annotations
+
+        // find peak intensity/ACE for the season
+        var peak_idx = d3.maxIndex(ace_stacked, function(d) {
+              return d3.max(d, function(d2) { return d2[1] - d2[0];})
+            })
+        var peak_val = d3.max(ace_stacked[peak_idx], function(d) { return d[1] - d[0];})
+        var peak_str
+        if (plot_type == "ace") {
+          peak_str = "The storm with the highest peak intensity in " + svg.attr("year") + " was " + storms[peak_idx] + " with a value of " + peak_val.toFixed(2) + "."
+        } else {
+          peak_str = "The storm with the highest ACE in " + svg.attr("year") + " was " + storms[peak_idx] + " with a value of " + peak_val.toFixed(2) + "."
+        }
+
+        var annot = d3.select(".ace_annotation_2")
+        if (annot.style("opacity") == 1) {
+          annot
+            .transition()
+            .duration(500)
+            .style("opacity", 0)
+        }
+        annot
+          .transition()
+          .duration(1000)
+          .style("opacity", 1)
+        if (plot_type == "ace") {
+          annot.html("A tropical cyclone's intensity is usually measured by its windspeed. To show the rate each storm contributes to a season's ACE value, this chart shows storm intensity as measured by the ACE it produces every 6 hours.<br/><br/>"+peak_str+"<br/><br/>The record peak intensity is 2.43 (ALLEN 1980).")
+        } else { 
+          annot.html("ACE is accumulated over the season as each tropical cyclone forms. Each colored region shown corresponds to a single named tropical storm, and its thickness corresponds to how much ACE that storm has produced to date.<br><br>"+peak_str+"<br/><br/>The record ACE for a single storm is 70.38 (IVAN 2004).")
+        }
+        
 
 
         var ace_total_text = d3.select(".num_ace")
