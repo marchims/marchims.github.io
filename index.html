@@ -418,7 +418,7 @@
           .transition()
           .duration(1000)
           .style("opacity", 1)
-        annot.html("Accumulated Cyclone Energy (ACE) is a measure of tropical cyclone activity, with higher numbers meaning more activity. Compared with an average hurricane season, active seasons feature either a larger number of storms, or have a few of high intensity.<br/><br/>ACE is typically calculated as the sum of the square of each storm's max winds at 6 hour intervals throughout the season.<br/><br/>The data described here apply to the North Atlantic basin, which produces landfalling storms for North America.<br/><br/>Click on any year to take a closer look.")
+        annot.html("Accumulated Cyclone Energy (ACE) is a measure of tropical cyclone activity, with higher numbers meaning more activity. Compared with an average hurricane season, active seasons feature either a larger number of storms, or have a few of high intensity.<br/><br/>ACE is typically calculated as the sum of the square of each storm's max windspeed at 6 hour intervals throughout the season.<br/><br/>The data described here apply to the North Atlantic basin, which produces landfalling storms for North America.<br/><br/>Click on any year to take a closer look.")
 
         svg.selectAll(".ace_points")
           .data(all_ace_total)
@@ -532,7 +532,7 @@
         controls
           .append("button")
           .attr("class","plot_type")
-          .style("width","140px")
+          .style("width","160px")
         controls
           .append("button")
           .attr("onclick","plot_all()")
@@ -711,9 +711,9 @@
             .attr("onclick","update_ace('ace_sum')")
             .text("ACE over Time")
           svg.select(".plot_title")
-            .text(svg.attr("year") + " Season - Storm Intensity over Time");
+            .text(svg.attr("year") + " Season - Active Cyclone Energy");
 
-          svg.selectAll(".ace_yax_label").text("Storm Intensity");
+          svg.selectAll(".ace_yax_label").text("Active Cyclone Energy");
           var ylim = d3.extent(ace_stacked, function(d) {
               return d3.max(d, function(d2) { return d2[1];})
             })
@@ -730,7 +730,7 @@
 
           controls.select(".plot_type")
             .attr("onclick","update_ace('ace')")
-            .text("Intensity over Time")
+            .text("Active Cyclone Energy")
           svg.select(".plot_title")
             .text(svg.attr("year") + " Season - ACE over Time");
 
@@ -861,7 +861,7 @@
           .duration(1000)
           .style("opacity", 1)
         if (plot_type == "ace") {
-          annot.html("A tropical cyclone's intensity is usually measured by its windspeed. To show the rate each storm contributes to a season's ACE value, this chart shows storm intensity as measured by the ACE it produces every 6 hours.<br/><br/>"+peak_str+"<br/><br/>The record peak intensity is 2.43 (ALLEN 1980).")
+          annot.html("To show the rate ACE is accumulated over the season, this chart shows the cyclone energy produced by all active storms at a given time. The thickness of a colored region shows the intensity of a given storm.<br/><br/>"+peak_str+"<br/><br/>The record peak intensity is 2.43 (ALLEN 1980).")
         } else { 
           annot.html("ACE is accumulated over the season as each tropical cyclone forms. Each colored region shown corresponds to a single named tropical storm, and its thickness corresponds to how much ACE that storm has produced to date.<br><br>"+peak_str+"<br/><br/>The record ACE for a single storm is 70.38 (IVAN 2004).")
         }
