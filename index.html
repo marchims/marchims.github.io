@@ -418,7 +418,7 @@
           .transition()
           .duration(1000)
           .style("opacity", 1)
-        annot.html("Accumulated Cyclone Energy (ACE) is a measure of tropical cyclone activity, with higher numbers meaning more activity. Compared with an average hurricane season, active seasons feature either a larger number of storms, or have a few of high intensity.<br/><br/>ACE is typically calculated as the sum of the square of each storm's max windspeed at 6 hour intervals throughout the season.<br/><br/>The data described here apply to the North Atlantic basin, which produces landfalling storms for North America.<br/><br/>Click on any year to take a closer look.")
+        annot.html("Accumulated Cyclone Energy (ACE) is a measure of tropical cyclone activity, with higher numbers meaning more activity. Compared with an average hurricane season, active seasons feature either a larger number of storms, or have a few of high intensity.<br/><br/>ACE is calculated as the sum of the square of each storm's max windspeed at 6 hour intervals throughout the season. This value is divided by 10,000 for readability.<br/><br/>The data described here apply to the North Atlantic basin, which produces landfalling storms for North America.<br/><br/>Click on any year to take a closer look.")
 
         svg.selectAll(".ace_points")
           .data(all_ace_total)
