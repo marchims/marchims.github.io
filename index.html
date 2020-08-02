@@ -679,7 +679,7 @@
         var line
         var fill = "none"
   
-        var keys = Array.from(Array(storms.length-1).keys())
+        var keys = Array.from(Array(storms.length).keys())
         var color = d3.scaleOrdinal()
           .domain(keys)
           .range(d3.schemeSet2)
@@ -774,7 +774,7 @@
             .style("top", d3.event.pageY + tooltip_offset.y + "px")
             .style("opacity", 1)
           if (plot_type == "ace") {
-            d3.selectAll(".tooltip").html(grp + "<br/>Peak Intensity: "+max_ace.toFixed(2))
+            d3.selectAll(".tooltip").html(grp + "<br/>Peak Energy: "+max_ace.toFixed(2))
           } else { 
             d3.selectAll(".tooltip").html(grp + "<br/>ACE: "+max_ace.toFixed(2))
           }
@@ -790,7 +790,7 @@
             .style("left", d3.event.pageX + tooltip_offset.x + "px")
             .style("top", d3.event.pageY + tooltip_offset.y + "px")
           if (plot_type == "ace") {
-            d3.selectAll(".tooltip").html(grp + "<br/>Peak Intensity: "+max_ace.toFixed(2))
+            d3.selectAll(".tooltip").html(grp + "<br/>Peak Energy: "+max_ace.toFixed(2))
           } else { 
             d3.selectAll(".tooltip").html(grp + "<br/>ACE: "+max_ace.toFixed(2))
           }
@@ -844,7 +844,7 @@
         var peak_val = d3.max(ace_stacked[peak_idx], function(d) { return d[1] - d[0];})
         var peak_str
         if (plot_type == "ace") {
-          peak_str = "The storm with the highest peak intensity in " + svg.attr("year") + " was " + storms[peak_idx] + " with a value of " + peak_val.toFixed(2) + "."
+          peak_str = "The storm with the highest peak energy in " + svg.attr("year") + " was " + storms[peak_idx] + " with a value of " + peak_val.toFixed(2) + "."
         } else {
           peak_str = "The storm with the highest ACE in " + svg.attr("year") + " was " + storms[peak_idx] + " with a value of " + peak_val.toFixed(2) + "."
         }
@@ -861,7 +861,7 @@
           .duration(1000)
           .style("opacity", 1)
         if (plot_type == "ace") {
-          annot.html("To show the rate ACE is accumulated over the season, this chart shows the cyclone energy produced by all active storms at a given time. The thickness of a colored region shows the intensity of a given storm.<br/><br/>"+peak_str+"<br/><br/>The record peak intensity is 2.43 (ALLEN 1980).")
+          annot.html("To show the rate ACE is accumulated over the season, this chart shows the cyclone energy produced by all active storms at a given time. The thickness of a colored region shows the intensity of a given storm.<br/><br/>"+peak_str+"<br/><br/>The record peak energy is 2.43 (ALLEN 1980).")
         } else { 
           annot.html("ACE is accumulated over the season as each tropical cyclone forms. Each colored region shown corresponds to a single named tropical storm, and its thickness corresponds to how much ACE that storm has produced to date.<br><br>"+peak_str+"<br/><br/>The record ACE for a single storm is 70.38 (IVAN 2004).")
         }
